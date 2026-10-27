@@ -63,7 +63,7 @@ it('impide eliminar un equipo prestado y responde 409', function () {
 
     $response->assertStatus(409)
         ->assertJson([
-            'mensaje' => 'No se puede eliminar un equipo que se encuentraprestado.',
+            'mensaje' => 'No se puede eliminar un equipo prestado.',
             'codigo' => 'REGLA_NEGOCIO',
         ]);
 
