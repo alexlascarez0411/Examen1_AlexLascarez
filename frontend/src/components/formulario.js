@@ -6,24 +6,100 @@ const $selectCategoria = document.querySelector("#categoria_id");
 const $btnGuardar = document.querySelector("#btn-guardar");
 
 /**
- * TODO [F3] Formulario de registro de equipos.
- *
- * iniciarFormulario({ alGuardar }):
- *  1. Llene el <select id="categoria_id"> con listarCategorias()
- *     (cree cada <option> con createElement, value = id, texto = nombre).
- *  2. Al enviar el formulario (submit):
- *     - Evite el envío tradicional.
- *     - Limpie los errores anteriores: textContent de [data-error] y aria-invalid de los campos.
- *     - Construya el objeto con FormData. categoria_id y costo_interno deben ir como números.
- *     - Deshabilite #btn-guardar y cambie su texto a "Guardando…" mientras espera.
- *     - Llame a crearEquipo(datos).
- *     - Éxito: limpie el formulario, mostrarMensaje("exito", "Equipo <codigo> registrado.")
- *              y llame a alGuardar().
- *     - 422: por cada campo de error.datos.errors, escriba el PRIMER mensaje en
- *            el <p data-error="<campo>"> y marque el campo con aria-invalid="true".
- *     - Otro error: mostrarMensaje("error", ...).
- *     - Siempre (finally): rehabilite el botón y restaure su texto.
+ * Formulario de registro de equipos y control de validaciones.
  */
 export const iniciarFormulario = ({ alGuardar }) => {
-  // TODO
+  // Carga inicial de categorias en el elemento select
+  const cargarCategorias = async () => {
+    try {
+      const respuesta = await listarCategorias();
+      const categorias = respuesta?.data || [];
+
+      categorias.forEach((categoria) => {
+        const option = document.createElement("option");
+        option.value = categoria.id;
+        option.textContent = categoria.nombre;
+        $selectCategoria.append(option);
+      });
+    } catch {
+      mostrarMensaje("error", "No se pudieron cargar las categorias.");
+    }
+  };
+
+  // Limpieza de mensajes de error previos y atributos de accesibilidad
+  const limpiarErrores = () => {
+    const mensajesError = document.querySelectorAll("[data-error]");
+    mensajesError.forEach((p) => {
+      p.textContent = "";
+    });
+
+    const camposInvalidos = $form.querySelectorAll("[aria-invalid]");
+    camposInvalidos.forEach((campo) => {
+      campo.removeAttribute("aria-invalid");
+    });
+  };
+
+  // Gestion del envio de formulario y procesamiento de respuesta
+  $form.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    limpiarErrores();
+
+    const formData = new FormData($form);
+    const datos = Object.fromEntries(formData.entries());
+
+    // Conversion de campos numericos segun contrato
+    if (datos.categoria_id) {
+      datos.categoria_id = Number(datos.categoria_id);
+    }
+    if (datos.costo_interno !== undefined && datos.costo_interno !== "") {
+      datos.costo_interno = Number(datos.costo_interno);
+    }
+    if (!datos.estado) {
+      delete datos.estado;
+    }
+
+    // Estado visual de espera en el boton de envio
+    const textoOriginal = $btnGuardar.textContent;
+    $btnGuardar.disabled = true;
+    $btnGuardar.textContent = "Guardando…";
+
+    try {
+      const resultado = await crearEquipo(datos);
+      const codigo = resultado?.data?.codigo || datos.codigo;
+
+      $form.reset();
+      mostrarMensaje("exito", `Equipo ${codigo} registrado.`);
+
+      if (typeof alGuardar === "function") {
+        alGuardar();
+      }
+    } catch (error) {
+      // Mapeo de errores de validacion 422 por campo
+      if (error?.datos?.errors) {
+        Object.entries(error.datos.errors).forEach(([campo, mensajes]) => {
+          const mensajeTexto = Array.isArray(mensajes) ? mensajes[0] : mensajes;
+          const parrafoError = document.querySelector(`[data-error="${campo}"]`);
+          if (parrafoError) {
+            parrafoError.textContent = mensajeTexto;
+          }
+
+          const campoInput = $form.querySelector(`[name="${campo}"]`);
+          if (campoInput) {
+            campoInput.setAttribute("aria-invalid", "true");
+          }
+        });
+      } else {
+        mostrarMensaje(
+          "error",
+          error?.datos?.mensaje || error.message || "Error al guardar el equipo."
+        );
+      }
+    } finally {
+      // Restauracion del estado del boton al finalizar la peticion
+      $btnGuardar.disabled = false;
+      $btnGuardar.textContent = textoOriginal;
+    }
+  });
+
+  cargarCategorias();
 };
