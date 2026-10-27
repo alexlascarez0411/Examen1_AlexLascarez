@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ReglaNegocioException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,15 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
-        // ---------------------------------------------------------------
-        // TODO [B5] Manejo centralizado de errores
-        //
-        // Traduzca App\Exceptions\ReglaNegocioException a una respuesta
-        // JSON con código 409 y el cuerpo:
-        //
-        //     { "mensaje": "<mensaje de la excepción>", "codigo": "REGLA_NEGOCIO" }
-        //
-        // Además, evite que estas excepciones se registren en la bitácora:
-        // no son errores del sistema, son reglas del dominio.
-        // ---------------------------------------------------------------
+        // No registrar en bitacora (no es un fallo técnico) la excepción de regla de negocio
+        $exceptions->dontReport(ReglaNegocioException::class);
+
+        // Mapear la excepcion a respuesta HTTP 409 Conflict
+        $exceptions->render(function (ReglaNegocioException $e, Request $request) {
+            return response()->json([
+                'mensaje' => $e->getMessage(),
+                'codigo' => 'REGLA_NEGOCIO',
+            ], 409);
+        });
     })->create();
